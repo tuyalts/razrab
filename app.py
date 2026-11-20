@@ -12,6 +12,8 @@ from states import TransitionNotAllowed
 
 app = Flask(__name__)
 
+app.json.ensure_ascii = False
+
 # Инициализация зависимости ОДИН раз при запуске
 books_repo = InMemoryBookRepository()
 readers_repo = InMemoryReaderRepository()
@@ -72,7 +74,15 @@ def health():
 @app.route("/lendings", methods=["POST"])
 def create_lending():
     data = request.get_json()
-    lending = process.reserve_book(BookId(UUID(data["book_id"])), ReaderId(UUID(data["reader_id"])))
+    if not data or "book_id" not in data or "reader_id" not in data:
+        return jsonify({"error": "BadRequest", "message": "Нужны book_id и reader_id"}), 400
+    try:
+        book_id = BookId(UUID(data["book_id"]))
+        reader_id = ReaderId(UUID(data["reader_id"]))
+    except ValueError:
+        return jsonify({"error": "InvalidUUID", "message": "Неверный формат UUID"}), 422
+        
+    lending = process.reserve_book(book_id, reader_id)
     return jsonify({"lending_id": str(lending.id.value)}), 201
 
 @app.route("/lendings/<lending_id>", methods=["GET"])

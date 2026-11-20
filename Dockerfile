@@ -1,12 +1,19 @@
 # Сборка зависимостей
-FROM python:3.12-slim AS builder
+FROM python:3.11-slim AS builder
 
 WORKDIR /app
 COPY requirements.txt .
-RUN pip install --user --no-cache-dir -r requirements.txt
+
+# Используем зеркало PyPI, чтобы обойти блокировку SSL в Codespaces
+RUN pip install --user --no-cache-dir --default-timeout=1000 \
+    -i https://pypi.tuna.tsinghua.edu.cn/simple \
+    -r requirements.txt
 
 # Запуск
-FROM python:3.12-slim
+FROM python:3.11-slim
+
+# Устанавливаем curl для healthcheck
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 
 # Создаем непривилегированного пользователя
 RUN useradd -m appuser
@@ -21,5 +28,5 @@ USER appuser
 
 ENV PATH=/home/appuser/.local/bin:$PATH
 
-# Запускаем gunicorn с 1 рабочим процессом (worker)
+# Запускаем gunicorn с 1 рабочим процессом
 CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "1", "app:app"]
